@@ -14,103 +14,77 @@ permissions:  # 需要写入 issue 的权限
 jobs:
   lint:
     runs-on: ubuntu-latest
-
+    
     steps:
       - name: Checkout the repository
         uses: actions/checkout@v3
-
+      
       - name: Install Go
         uses: actions/setup-go@v4
         with:
           go-version: '1.24'
-
-      # - name: Install go-critic
-      #   run: |
-      #     go install github.com/go-critic/go-critic/cmd/gocritic@latest
-      #   shell: bash
-
+      
       - name: Add Go binaries to PATH
         run: |
           echo "$HOME/go/bin" >> $GITHUB_PATH
         shell: bash
-
+      
       - name: Debug environment
         run: |
           echo "Current shell: $SHELL"
           echo "Current PATH: $PATH"
           which mkdir
         shell: bash
-
+      
       - name: Analyze the repository
         run: |
           repo="${{ inputs.repo_url }}"
           echo "Processing repository: $repo"
           repo_name=$(basename -s .git "$repo")
-
+          
           mkdir -p repos
           cd repos
           git clone "$repo" "$repo_name"
           cd "$repo_name"
-
-           # 添加提交间隔延迟
-          # echo "添加提交间延迟..."
-          # sleep 0.1
-          # sleep 1
-
+          
           # 第一次记录（分析前）
-          echo "仓库大小（分析前）: $(du -sh)" > ../../repo-size-before-$repo_name.txt
-
+          echo "仓库大小（分析前）: $(du -sh)" > ../../repo-size-before.txt
+          
           # 运行 go vet 并过滤 downloading 关键字
-          go vet ./... > ../../go-vet-report-$repo_name.txt 2> >(grep -v 'downloading' > ../../go-vet-errors-$repo_name.txt) || true
-
+          go vet ./... > ../../go-vet-report.txt 2> >(grep -v 'downloading' > ../../go-vet-errors.txt) || true
+          
           # 第二次记录（分析后）
-          echo "仓库大小（分析后）: $(du -sh)" > ../../repo-size-after-$repo_name.txt
-
+          echo "仓库大小（分析后）: $(du -sh)" > ../../repo-size-after.txt
+          
           cd ..
           rm -rf "$repo_name"
-
+      
       - name: Collect analysis reports
         run: |
           repo_name=$(basename -s .git "${{ inputs.repo_url }}")
           
-          # 读取错误时再次过滤
-          ERRORS=$(grep -v 'downloading' go-vet-errors-$repo_name.txt 2>/dev/null || echo "没有关键错误")
-
-          # 修改报告输出格式
-          echo "reports<<EOF" >> $GITHUB_ENV
-          echo -e "### $repo_name 报告:\n<details>\n<summary>点击展开详细报告</summary>\n\`\`\`\n$REPORTS\n\`\`\`\n</details>" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-          echo "errors<<EOF" >> $GITHUB_ENV
-          echo -e "### 关键错误:\n\`\`\`\n$ERRORS\n\`\`\`" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
           # 读取两次大小记录
-          SIZE_BEFORE=$(cat repo-size-before-$repo_name.txt 2>/dev/null || echo "未获取到分析前大小")
-          SIZE_AFTER=$(cat repo-size-after-$repo_name.txt 2>/dev/null || echo "未获取到分析后大小")
-
+          SIZE_BEFORE=$(cat repo-size-before.txt 2>/dev/null || echo "未获取到分析前大小")
+          SIZE_AFTER=$(cat repo-size-after.txt 2>/dev/null || echo "未获取到分析后大小")
+          
+          # 读取报告和错误
+          REPORTS=$(cat go-vet-report.txt 2>/dev/null || echo "没有生成报告")
+          ERRORS=$(cat go-vet-errors.txt 2>/dev/null || echo "没有错误")
+          
+          # 将信息设置为输出变量
           echo "repo_size<<EOF" >> $GITHUB_ENV
           echo -e "### 仓库大小\n- 分析前: ${SIZE_BEFORE#仓库大小（分析前）: }\n- 分析后: ${SIZE_AFTER#仓库大小（分析后）: }" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-
-          # 将报告和错误合并
-          REPORTS=$(cat go-vet-report-$repo_name.txt 2>/dev/null || echo "没有生成报告")
-          ERRORS=$(cat go-vet-errors-$repo_name.txt 2>/dev/null || echo "没有错误")
-
-          # 将信息设置为输出变量
-          echo "repo_size<<EOF" >> $GITHUB_ENV
-          echo -e "### 仓库大小:\n$REPO_SIZE" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
+          
           echo "reports<<EOF" >> $GITHUB_ENV
-          echo -e "### $repo_name 报告:\n\`\`\`\n$REPORTS\n\`\`\`" >> $GITHUB_ENV
+          echo -e "### $repo_name 报告:\n<details>\n<summary>点击展开详细报告</summary>\n\`\`\`\n$REPORTS\n\`\`\`\n</details>" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-
+          
           echo "errors<<EOF" >> $GITHUB_ENV
-          echo -e "### $repo_name 错误:\n\`\`\`\n$ERRORS\n\`\`\`" >> $GITHUB_ENV
+          echo -e "### 关键错误:\n\`\`\`\n$ERRORS\n\`\`\`" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
         shell: bash
-
+      
       - name: Create or update issue with analysis results
         uses: peter-evans/create-or-update-comment@v3
         with:
@@ -118,15 +92,15 @@ jobs:
           issue-number: 3
           body: |
             # Go Vet 静态分析报告
-
+            
             ## 项目路径
             ${{ inputs.repo_url }}
-
+            
             ## 仓库大小
             ${{ env.repo_size }}
-
+            
             ## 分析错误
             ${{ env.errors }}
-
+            
             ## 详细报告
             ${{ env.reports }}
