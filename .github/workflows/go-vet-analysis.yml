@@ -47,28 +47,51 @@ jobs:
           echo "Processing repository: $repo"
           repo_name=$(basename -s .git "$repo")
 
-          # 创建临时目录并克隆仓库
           mkdir -p repos
           cd repos
           git clone "$repo" "$repo_name"
           cd "$repo_name"
 
-          # 新增：记录仓库大小
-          echo "仓库大小: $(du -sh)" > ../../repo-size-$repo_name.txt
+           # 添加提交间隔延迟
+          echo "添加提交间延迟..."
+          sleep 0.1
+          sleep 1
 
-          # 运行 go vet 并捕获输出
-          go vet ./... > ../../go-vet-report-$repo_name.txt 2> ../../go-vet-errors-$repo_name.txt || true
+          # 第一次记录（分析前）
+          echo "仓库大小（分析前）: $(du -sh)" > ../../repo-size-before-$repo_name.txt
 
-          # 返回上层目录
+          # 运行 go vet 并过滤 downloading 关键字
+          go vet ./... > ../../go-vet-report-$repo_name.txt 2> >(grep -v 'downloading' > ../../go-vet-errors-$repo_name.txt) || true
+
+          # 第二次记录（分析后）
+          echo "仓库大小（分析后）: $(du -sh)" > ../../repo-size-after-$repo_name.txt
+
           cd ..
           rm -rf "$repo_name"
-        shell: bash
 
       - name: Collect analysis reports
         run: |
           repo_name=$(basename -s .git "${{ inputs.repo_url }}")
-          # 读取仓库大小
-          REPO_SIZE=$(cat repo-size-$repo_name.txt 2>/dev/null || echo "无法获取仓库大小")
+          
+          # 读取错误时再次过滤
+          ERRORS=$(grep -v 'downloading' go-vet-errors-$repo_name.txt 2>/dev/null || echo "没有关键错误")
+
+          # 修改报告输出格式
+          echo "reports<<EOF" >> $GITHUB_ENV
+          echo -e "### $repo_name 报告:\n<details>\n<summary>点击展开详细报告</summary>\n\`\`\`\n$REPORTS\n\`\`\`\n</details>" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          echo "errors<<EOF" >> $GITHUB_ENV
+          echo -e "### 关键错误:\n\`\`\`\n$ERRORS\n\`\`\`" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
+
+          # 读取两次大小记录
+          SIZE_BEFORE=$(cat repo-size-before-$repo_name.txt 2>/dev/null || echo "未获取到分析前大小")
+          SIZE_AFTER=$(cat repo-size-after-$repo_name.txt 2>/dev/null || echo "未获取到分析后大小")
+
+          echo "repo_size<<EOF" >> $GITHUB_ENV
+          echo -e "### 仓库大小\n- 分析前: ${SIZE_BEFORE#仓库大小（分析前）: }\n- 分析后: ${SIZE_AFTER#仓库大小（分析后）: }" >> $GITHUB_ENV
+          echo "EOF" >> $GITHUB_ENV
 
           # 将报告和错误合并
           REPORTS=$(cat go-vet-report-$repo_name.txt 2>/dev/null || echo "没有生成报告")
@@ -92,7 +115,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: 1
+          issue-number: 2
           body: |
             # Go Vet 静态分析报告
 

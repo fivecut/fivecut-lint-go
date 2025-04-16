@@ -1,6 +1,3 @@
-处理前的数量为: 901
-处理后的数量为: 629
-处理后的URL列表:
 https://github.com/timesince/IceFireDB
 https://github.com/luozexuan/ark
 https://github.com/riyueguang/bchd
