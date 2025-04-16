@@ -53,9 +53,9 @@ jobs:
           cd "$repo_name"
 
            # 添加提交间隔延迟
-          echo "添加提交间延迟..."
-          sleep 0.1
-          sleep 1
+          # echo "添加提交间延迟..."
+          # sleep 0.1
+          # sleep 1
 
           # 第一次记录（分析前）
           echo "仓库大小（分析前）: $(du -sh)" > ../../repo-size-before-$repo_name.txt
@@ -115,7 +115,7 @@ jobs:
         uses: peter-evans/create-or-update-comment@v3
         with:
           token: ${{ secrets.GITHUB_TOKEN }}
-          issue-number: 2
+          issue-number: 3
           body: |
             # Go Vet 静态分析报告
 
