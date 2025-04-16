@@ -22,12 +22,12 @@ jobs:
       - name: Install Go
         uses: actions/setup-go@v4
         with:
-          go-version: '1.21'
+          go-version: '1.24'
 
-      - name: Install go-critic
-        run: |
-          go install github.com/go-critic/go-critic/cmd/gocritic@latest
-        shell: bash
+      # - name: Install go-critic
+      #   run: |
+      #     go install github.com/go-critic/go-critic/cmd/gocritic@latest
+      #   shell: bash
 
       - name: Add Go binaries to PATH
         run: |

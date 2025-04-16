@@ -16,8 +16,8 @@ on:
       workflow:
         description: |
           The workflow to submit with each repo.
-          Default 'go-critic-analysis.yml'.
-        default: "go-critic-analysis.yml"
+          Default 'go-vet-analysis.yml'.
+        default: "go-vet-analysis.yml"
 
 permissions:
   actions: write
@@ -39,7 +39,7 @@ jobs:
           done < ${{ inputs.source }}
           echo "EOF" >> $GITHUB_ENV
 
-      - name: Submit each repo to go-critic-analysis
+      - name: Submit each repo to go-vet-analysis
         run: |
           IFS=$'\n' # Set the Internal Field Separator to newline
           for url in $REPO_URLS; do
